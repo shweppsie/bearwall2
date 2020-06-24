@@ -592,6 +592,35 @@ function load_interface_rules() {
 	fi
 
 }
+
+function build_interface_vmap() {
+	local vmap_name="${1}"
+	local vmap_chain="${2}"
+	local -n _interfaces_all="${3}"
+	local -n _interfaces_configured="${4}"
+
+	local vmap_str=()
+
+	local valid_interface=0
+	vmap_str+=("		meta ${vmap_name} vmap {")
+	for i in "${_interfaces_configured[@]}"; do
+		for j in "${_interfaces_all[@]}"; do
+			if [ "${j}" == "${i}" ]; then
+				vmap_str+=("			${i}: jump ${i}_${vmap_chain},")
+				valid_interface=1
+				break
+			fi
+		done
+	done
+	vmap_str+=("		}")
+
+	if [ "${valid_interface}" -eq 1 ]; then
+		for line in "${vmap_str[@]}"; do
+			echo "${line}" >> "${OF}"
+		done
+	fi
+}
+
 function build_vmap () {
 	REG=$1
 	shift
@@ -599,6 +628,8 @@ function build_vmap () {
 	shift
 	HOOK=$1
 	shift
+
+	local interfaces_configured=("${@}")
 
 	case $HOOK in
 		input|prerouting)
@@ -629,29 +660,11 @@ function build_vmap () {
 		echo "	chain $CHAIN {" >> "${OF}"
 		echo "		type ${chain_type} hook ${HOOK} priority 0; policy ${default_policy};" >> "${OF}"
 
-		if [ "$VMAP_IIF" -eq 1 ]; then
-			echo "		meta $map_iif vmap {" >> "${OF}"
-			for i in "$@"; do
-				for j in "${INTERFACES[@]}"; do
-					if [ "$j" == "$i" ]; then
-						echo "			$i: jump ${i}_$CHAIN," >> "${OF}"
-						break
-					fi
-				done
-			done
-			echo "		}" >> "${OF}"
+		if [ "${VMAP_IIF}" -eq 1 ]; then
+			build_interface_vmap "${map_iif}" "${CHAIN}" INTERFACES interfaces_configured
 		fi
 		if [ "$VMAP_IFNAME" -eq 1 ]; then
-			echo "		meta $map_ifname vmap {" >> "${OF}"
-			for i in "$@"; do
-				for j in "${INTERFACES_IFNAME[@]}"; do
-					if [ "$j" == "$i" ]; then
-						echo "			\"$i\": jump ${i}_$CHAIN," >> "${OF}"
-						break
-					fi
-				done
-			done
-			echo "		}" >> "${OF}"
+			build_interface_vmap "${map_ifname}" "${CHAIN}" INTERFACES_IFNAME interfaces_configured
 		fi
 
 		if [ "${conf_logging}" != "none" ]; then
@@ -661,58 +674,23 @@ function build_vmap () {
 		echo "	}" >> "${OF}"
 	fi
 }
+
 function build_vmap_fwd () {
 	if [ "${HOOK_FORWARD}" -gt 0 ]; then
 		echo "	chain forward {" >> "${OF}"
 		echo "		type filter hook forward priority 0; policy drop;" >> "${OF}"
 		if [ "${VMAP_IIF}" -eq 1 ] && [ "${HOOK_FORWARD_IN}" -gt 0 ]; then
-			echo "		meta iif vmap {" >> "${OF}"
-			for i in "${FORWARD_IN_IFACE[@]}"; do
-				for j in "${INTERFACES[@]}"; do
-					if [ "$j" == "$i" ]; then
-						echo "			$i: jump ${i}_fwd_in," >> "${OF}"
-						break
-					fi
-				done
-			done
-			echo "		}" >> "${OF}"
+			build_interface_vmap "iif" "fwd_in" INTERFACES FORWARD_IN_IFACE
 		fi
 		if [ "${VMAP_IFNAME}" -eq 1 ] && [ "${HOOK_FORWARD_IN}" -gt 0 ]; then
-			echo "		meta iifname vmap {" >> "${OF}"
-			for i in "${FORWARD_IN_IFACE[@]}"; do
-				for j in "${INTERFACES_IFNAME[@]}"; do
-					if [ "$j" == "$i" ]; then
-						echo "			$i: jump ${i}_fwd_in," >> "${OF}"
-						break
-					fi
-				done
-			done
-			echo "		}" >> "${OF}"
+			build_interface_vmap "iifname" "fwd_in" INTERFACES_IFNAME FORWARD_IN_IFACE
 		fi
 
 		if [ "${VMAP_IIF}" -eq 1 ] && [ "${HOOK_FORWARD_OUT}" -gt 0 ]; then
-			echo "		meta oif vmap {" >> "${OF}"
-			for i in "${FORWARD_OUT_IFACE[@]}"; do
-				for j in "${INTERFACES[@]}"; do
-					if [ "$j" == "$i" ]; then
-						echo "			$i: jump ${i}_fwd_out," >> "${OF}"
-						break
-					fi
-				done
-			done
-			echo "		}" >> "${OF}"
+			build_interface_vmap "oif" "fwd_out" INTERFACES FORWARD_OUT_IFACE
 		fi
 		if [ "${VMAP_IFNAME}" -eq 1 ] && [ "${HOOK_FORWARD_OUT}" -gt 0 ]; then
-			echo "		meta oifname vmap {" >> "${OF}"
-			for i in "${FORWARD_OUT_IFACE[@]}"; do
-				for j in "${INTERFACES_IFNAME[@]}"; do
-					if [ "$j" == "$i" ]; then
-						echo "			$i: jump ${i}_fwd_out," >> "${OF}"
-						break
-					fi
-				done
-			done
-			echo "		}" >> "${OF}"
+			build_interface_vmap "oifname" "fwd_out" INTERFACES_IFNAME FORWARD_OUT_IFACE
 		fi
 
 		if [ "${conf_logging}" != "none" ]; then
