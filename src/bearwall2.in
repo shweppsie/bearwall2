@@ -213,6 +213,7 @@ To rollback without waiting, run:
 	if ! /usr/sbin/nft -f "${OF}"; then
 		substatus "Error loading nftables rules, abandoning new changes"
 		stop_rollbacks
+		exit -1
 	fi
 elif [ "${MODE}" == "dryrun" ]; then
 	status "Dry-run mode, not loading firewall policies"
