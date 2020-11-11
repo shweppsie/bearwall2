@@ -652,7 +652,18 @@ function build_vmap () {
 			;;
 		input|output)
 			chain_type="filter"
-			default_policy="drop"
+			case ${conf_default_policy_filter} in
+				accept)
+					default_policy="accept"
+					;;
+				drop)
+					default_policy="drop"
+					;;
+				*)
+					echo "Unknown option '$conf_default_policy_filter' for default_policy_filter in bearwall2.conf"
+					exit -1
+					;;
+			esac
 			;;
 	esac
 
@@ -677,8 +688,20 @@ function build_vmap () {
 
 function build_vmap_fwd () {
 	if [ "${HOOK_FORWARD}" -gt 0 ]; then
+		case ${conf_default_policy_forward} in
+			accept)
+				default_policy="accept"
+				;;
+			drop)
+				default_policy="drop"
+				;;
+			*)
+				echo "Unknown option '$conf_default_policy_forward' for default_policy_forward in bearwall2.conf"
+				exit -1
+				;;
+		esac
 		echo "	chain forward {" >> "${OF}"
-		echo "		type filter hook forward priority 0; policy drop;" >> "${OF}"
+		echo "		type filter hook forward priority 0; policy ${default_policy};" >> "${OF}"
 		if [ "${VMAP_IIF}" -eq 1 ] && [ "${HOOK_FORWARD_IN}" -gt 0 ]; then
 			build_interface_vmap "iif" "fwd_in" INTERFACES FORWARD_IN_IFACE
 		fi

@@ -111,3 +111,21 @@ always_ifname="ppp"
 #
 # Default rollback_delay=30
 rollback_delay=30
+
+#
+# Fallback policy
+#
+# Be default bearwall will set the default policy when there is no matching
+# rules to drop. In some cases you may want to change this behaviour
+# (for example to only firewall particular interfaces).
+#
+# Values:
+#    - accept
+#        Packets that don't match a rule will be accepted
+#    - drop
+#        Packets that don't match a rule will be dropped
+#
+# Default default_policy_filter="drop"
+# Default default_policy_forward="drop"
+default_policy_filter="drop"
+default_policy_forward="drop"
